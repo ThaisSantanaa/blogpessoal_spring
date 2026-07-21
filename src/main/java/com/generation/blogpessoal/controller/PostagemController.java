@@ -1,87 +1,147 @@
 package com.generation.blogpessoal.controller;
- 
+
 import java.util.List;
+
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.http.HttpStatus;
+
 import org.springframework.http.ResponseEntity;
+
 import org.springframework.web.bind.annotation.CrossOrigin;
+
 import org.springframework.web.bind.annotation.DeleteMapping;
+
 import org.springframework.web.bind.annotation.GetMapping;
+
 import org.springframework.web.bind.annotation.PathVariable;
+
 import org.springframework.web.bind.annotation.PostMapping;
+
 import org.springframework.web.bind.annotation.PutMapping;
+
 import org.springframework.web.bind.annotation.RequestBody;
+
 import org.springframework.web.bind.annotation.RequestMapping;
+
 import org.springframework.web.bind.annotation.ResponseStatus;
+
 import org.springframework.web.bind.annotation.RestController;
+
 import org.springframework.web.server.ResponseStatusException;
 
 import com.generation.blogpessoal.model.Postagem;
+
 import com.generation.blogpessoal.repository.PostagemRepository;
 
+import com.generation.blogpessoal.repository.TemaRepository;
+
 import jakarta.validation.Valid;
- 
-@RestController // Indica que esta classe é um controlador REST. Ou seja, ela vai responder requisições HTTP (GET, POST, PUT, DELETE). e retornar dados geralmente em formato JSON.
- 
-@RequestMapping("postagens") // Define o caminho base da URL para acessar os métodos desta classe. Exemplo: http://localhost:8080/postagens
- 
-@CrossOrigin(origins = "*", allowedHeaders = "*") // Permite requisições de diferentes origens (CORS). Aqui está liberado para qualquer domínio (*) acessar a API. Útil quando o frontend está em outro servidor.
+
+@RestController
+
+@RequestMapping("/postagens")
+
+@CrossOrigin(origins = "*", allowedHeaders = "*") // liberar requisições de servidores diferentes
+
 public class PostagemController {
-	
-	@Autowired //Injeta o repository automaticamente.Transferencia de responsabilidade.
-	private PostagemRepository postagemRepository; //terei acesso a todos os métodos de repository
-	
+
+	@Autowired
+
+	private TemaRepository temaRepository;
+
+	@Autowired
+
+	private PostagemRepository postagemRepository;
+
 	@GetMapping
-	public ResponseEntity<List<Postagem>> getAll(){
-		return ResponseEntity.ok(postagemRepository.findAll()); // Equivalente: SELECT * FROM t_postagens
+
+	public ResponseEntity<List<Postagem>> getAll() {
+
+		return ResponseEntity.ok(postagemRepository.findAll());
+
 	}
-	
+
 	@GetMapping("/{id}")
-	public ResponseEntity<Postagem> getById(@PathVariable Long id){ //PathVariabl acha o ID no caminho e
-		return postagemRepository.findById(id) // SELECT * FROM tb_postagens WHERE id = ?
-				.map(resposta -> ResponseEntity.ok(resposta)) //Guarda o que vc achou dentro de resposta.
-				.orElse(ResponseEntity.notFound().build()); //Não achou nada, está vazio o optional, então ele devolve o notFound que seria o método 404
+
+	// Resposta HTTP carrega uma Postagem e um status
+
+	public ResponseEntity<Postagem> getById(@PathVariable Long id) {
+
+		return postagemRepository.findById(id) // busca no banco e retorna um Optional<Postagem>
+
+				.map(resposta -> ResponseEntity.ok(resposta)) // SE
+
+				.orElse(ResponseEntity.notFound().build()); // SENAO
+
 	}
-	
-	@GetMapping("/titulo/{titulo}")
-	public ResponseEntity<List<Postagem>> getAllByTitulo(@PathVariable String titulo){
-		return ResponseEntity.ok(postagemRepository.findAllByTituloContainingIgnoreCase(titulo)); // SELECT * FROM t_postagens
-	//Equivalente: SELECT * FROM tb_postangens WHERE titulo LIKE "%?%"
+
+	@GetMapping("titulo/{titulo}") // (etiqueta/ titulo)
+
+	public ResponseEntity<List<Postagem>> getAllByTitulo(@PathVariable String titulo) {
+
+		return ResponseEntity.ok(postagemRepository.findAllByTituloContainingIgnoreCase(titulo));
+
 	}
-	
+
 	@PostMapping
-	public ResponseEntity<Postagem> post(@Valid @RequestBody Postagem postagem) {//@Valid: aplica as validações definidas na entidade (ex: @NotBlank, @Size). @RequestBody: indica que os dados no corpo da requisição serão HTTP (em formato JSON)
-		return ResponseEntity.status(HttpStatus.CREATED)
-				.body(postagemRepository.save(postagem));
-	//Equivalente: INSERT INTO tb_postagens(titulo, texto) VALUES(?, ?);
+
+	public ResponseEntity<Postagem> post(@Valid @RequestBody Postagem postagem) {
+
+		if (temaRepository.existsById(postagem.getTema().getId())) {
+
+			postagem.setId(null);
+
+			return ResponseEntity.status(HttpStatus.CREATED)
+
+					.body(postagemRepository.save(postagem));
+
+		}
+
+		throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O tema não existe !", null);
+
 	}
-	
+
 	@PutMapping
+
 	public ResponseEntity<Postagem> put(@Valid @RequestBody Postagem postagem) {
-		if(postagemRepository.existsById(postagem.getId()))
-		return ResponseEntity.ok(postagemRepository.save(postagem));
-		
-	//Equivalente: UPDATE tb_postagens SET titulo = ?, texto = ? WHERE id + ?;
-		
+
+		if (temaRepository.existsById(postagem.getTema().getId())) {
+
+			if (postagemRepository.existsById(postagem.getId())) {
+
+				return ResponseEntity.ok(postagemRepository.save(postagem));
+
+				// UPDATE tb_postagens SET titulo = ?, texto = ? WHERE id = ?;
+
+			}
+
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O tema não existe !", null);
+
+		}
+
 		return ResponseEntity.notFound().build();
+
 	}
-	
+
 	@ResponseStatus(HttpStatus.NO_CONTENT)
+
 	@DeleteMapping("/{id}")
-	public void delete(@PathVariable Long id){
-		
+
+	public void delete(@PathVariable Long id) {
+
 		Optional<Postagem> postagem = postagemRepository.findById(id);
-		
-		if(postagem.isEmpty())
+
+		if (postagem.isEmpty())
+
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-		
+
 		postagemRepository.deleteById(id);
-		
-		//DELETE FROM tb_postagens WHERE id = ?;
-		
+
+		// DELETE FROM tb_postagens WHERE id = ?;
+
 	}
+
 }
- 
- 
